@@ -1,8 +1,11 @@
-import csv, io, hashlib
+import csv, io
 from app.errors import BusinessError
 from app.reasons import reject
 
-def read_source(state, fields, aliases):
+def clean_header(cells, aliases):
+    return [aliases.get(v.strip(), v.strip()) for v in cells]
+
+def read_source(state, fields, aliases, optional=()):
     raw=state['raw_bytes']
     if not raw: raise BusinessError('EMPTY_FILE','请选择非空文件')
     if not raw.strip(b'\xef\xbb\xbf\r\n \t'): raise BusinessError('BLANK_FILE','文件只有空行')
@@ -14,8 +17,10 @@ def read_source(state, fields, aliases):
     stream=csv.reader(io.StringIO(text,newline=''),strict=True)
     try:
         original=next(stream)
-        header=[aliases.get(v.strip(),v.strip()) for v in original]
-        if header!=fields: raise BusinessError('BAD_HEADER','字段或顺序不匹配')
+        header=clean_header(original, aliases)
+        # 温度列为可选的尾列：无温度批保持原有表头，带温度批追加一列。
+        if header!=list(fields) and header!=list(fields)+list(optional):
+            raise BusinessError('BAD_HEADER','字段或顺序不匹配')
         state['counts']={'input':0,'blank':0,'repeated_header':0,'duplicate':0}
         records=[]
         for cells in stream:
@@ -23,7 +28,7 @@ def read_source(state, fields, aliases):
             state['counts']['input']+=1
             if not cells or not any(v.strip() for v in cells):
                 state['counts']['blank']+=1;continue
-            if cells==original:
+            if clean_header(cells, aliases)==header:
                 state['counts']['repeated_header']+=1;continue
             row=dict(zip(header,cells));row['_line']=line
             if len(cells)!=len(header): reject(state,row,'COLUMN_COUNT',f'需要{len(header)}列，实际{len(cells)}列');continue
@@ -43,4 +48,5 @@ def read_source(state, fields, aliases):
             selected.append(rows[0]);state['counts']['duplicate']+=len(rows)-1
     state['records']=selected
     state['encoding']=encoding
+    state['has_temperature']='temperature' in header
     state['views'][state['context']['keys'][0]]={'rows':[dict(r) for r in selected], 'metrics':{'采信行':len(selected),'隔离行':len(state['quarantine']),'重复行':state['counts']['duplicate']},'title':'原始证据'}

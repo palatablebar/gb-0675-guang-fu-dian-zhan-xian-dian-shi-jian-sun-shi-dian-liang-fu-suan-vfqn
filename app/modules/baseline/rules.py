@@ -1,5 +1,6 @@
 from decimal import Decimal
 from app.coerce import number,instant
+from app.temperature import plan as temperature_plan, correct as temperature_correct
 
 def estimate(segment,records,context):
     base={**segment,'baseline_kw':None,'reference_ids':[]}
@@ -22,5 +23,9 @@ def estimate(segment,records,context):
     return {**base,'baseline_kw':str(baseline),'reference_ids':sorted(x[1] for x in references),'code':'ESTIMATED'}
 
 def apply(state):
-    estimates=[estimate(s,state['records'],state['context']) for s in state['segments']];state['estimates']=estimates
-    state['views']['baseline']={'title':'对照基线','rows':estimates,'metrics':{'可估计':sum(r['code']=='ESTIMATED' for r in estimates),'未定':sum(r['code']!='ESTIMATED' for r in estimates),'对照下限':state['context']['min_references']}}
+    # 先拟合未修正基线，再逐片段叠加温度证据；温度不改变“采用哪组对照”。
+    plan_=temperature_plan(state);state['temperature_plan']={k:(str(v) if isinstance(v,Decimal) else v) for k,v in plan_.items()}
+    estimates=[temperature_correct(estimate(s,state['records'],state['context']),plan_,state['context']) for s in state['segments']]
+    state['estimates']=estimates
+    applied=sum(r.get('temp_state')=='applied' for r in estimates);pending=sum(r.get('temp_state')=='pending' for r in estimates)
+    state['views']['baseline']={'title':'对照基线','rows':estimates,'metrics':{'可估计':sum(r['code']=='ESTIMATED' for r in estimates),'未定':sum(r['code']!='ESTIMATED' for r in estimates),'对照下限':state['context']['min_references'],'温度已修正':applied,'温度待查':pending}}

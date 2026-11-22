@@ -15,6 +15,10 @@ docker compose exec -T app pytest -q
 
 同输入与规则版本生成相同批号，只保留一条批次。复核入口 `POST /api/runs/{run_id}/review` 提交当前 `revision`，陈旧提交409。归档包只有一个下载入口 `GET /api/export/{run_id}`，含证据和运行摘要。原始隔离在页面同屏显示。
 
+温度修正按片段结算，裁定见 `docs/RULING-TEMPERATURE.md`。遥测可选尾列 `temperature`（°C）是该片段唯一的温度证据；修正量、未修正基线与限电事件、对照依据在同一损失行互相解释。日最高温统一扣减只作建议值，相关片段全部待查。证据不足的片段保持未定并阻止归档。`heat` 样例带温度列；`temperature_correction` 覆盖项支持 `mode`（`segment`/`daily_max`/`off`）、`reference_c`、`coefficient_per_c`、`daily_max_c`。
+
+重跑同一批不新增、不覆盖已结算结果；规则版本变化导致批号漂移时返回 `409 RERUN_DIVERGED` 并保留旧版。切换样例失败不写入新批次，原批次仍可读。
+
 SQLite使用命名卷，容器重启后保留历史。要重建演示可在Compose中改用新的卷名称，保留旧卷。
 
 源码在 `app/`，样例在 `sample_data/`，测试在 `tests/`；定义见 `docs/DATA-DICTIONARY.md`，模块和边界测试对应关系见 `docs/DEPTH.md`。输入上限2MB，属于离线复核工具。

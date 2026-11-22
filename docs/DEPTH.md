@@ -29,10 +29,14 @@
 | TRAP-06 | 全角千分位 | 静默错算或证据丢失 | 以可复核规则显式处理 | `app/modules/devices/rules.py` | `tests/test_devices.py::test_fullwidth_number` |
 | TRAP-11 | UTC归一 | 静默错算或证据丢失 | 以可复核规则显式处理 | `app/modules/devices/rules.py` | `tests/test_devices.py::test_time_equivalence` |
 | TRAP-23 | 限电区间并集 | 静默错算或证据丢失 | 以可复核规则显式处理 | `app/modules/slicing/rules.py` | `tests/test_slicing.py::test_overlapping_real` |
+| TRAP-31 | 高温未限电降额按日最高温统一扣减 | 把高温降额算成限电，或反向少算 | 逐片段绑定温度证据；日最高温只给建议值并全部待查 | `app/temperature.py` | `tests/test_temperature.py::test_daily_max_is_proposal_only` |
+| TRAP-32 | 温度证据缺失/越界/未覆盖时段 | 填0、回退未修正基线或借用邻近样本 | 片段待查，损失null，阻止归档 | `app/temperature.py` | `tests/test_temperature.py::test_temperature_missing_is_pending_not_zero` |
+| TRAP-33 | 已复核批重跑规则版本变化 | 覆盖已结算结果或静默新增批 | 批号不一致返回409保留旧版 | `app/store.py` | `tests/test_versioning.py::test_rerun_divergence_keeps_old_batch` |
 
 ## 对账规则
 
 原始逻辑输入=采纳行+隔离行+空行+重复表头+同值重复。业务计算按 DATA-DICTIONARY.md 分别核验，不能把上级与下级重复加总。所有隔离保留编号、原值、原始行号和稳定原因码。
+能量对账同时核验两条恒等式：修正后 `baseline_kwh = actual_kwh + loss_kwh`，以及 `raw_baseline_kwh = baseline_kwh + temp_adjust_kwh`（未修正基线 = 修正基线 + 温度扣减）。后者保证温度修正量可解释，不会被混进限电损失。温度待查片段保留在未定片段中，不并入任何已确定汇总。
 
 ## 已知不覆盖
 

@@ -7,5 +7,7 @@ def serialize(result):
     buffer=io.BytesIO()
     with zipfile.ZipFile(buffer,'w',compression=zipfile.ZIP_DEFLATED) as archive:
         archive.writestr('manifest.json',json.dumps({**result['manifest'],'revision':result.get('revision',1),'status':result.get('status','待复核')},ensure_ascii=False,indent=2))
-        archive.writestr('evidence.json',json.dumps({'counts':result['counts'],'views':result['views'],'quarantine':result['quarantine']},ensure_ascii=False,indent=2))
+        # 证据包同时固化温度口径与逐片段温度依据，便于复核追溯修正量。
+        archive.writestr('evidence.json',json.dumps({'counts':result['counts'],'views':result['views'],'quarantine':result['quarantine'],
+            'temperature':{'plan':result.get('temperature_plan'),'rows':result.get('energy_rows',[])}},ensure_ascii=False,indent=2))
     return buffer.getvalue()

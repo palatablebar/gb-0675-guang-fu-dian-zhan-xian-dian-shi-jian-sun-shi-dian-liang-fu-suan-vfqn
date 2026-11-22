@@ -16,6 +16,22 @@ def save(path, result):
         con.execute('INSERT OR IGNORE INTO runs(id,digest,result) VALUES(?,?,?)', (run_id,result['manifest']['sha256'],json.dumps(result,ensure_ascii=False)))
     return get(path,run_id)
 
+def save_rerun(path, result, expected_id):
+    """重跑：同批号幂等保留；已存在且已复核时绝不覆盖。
+
+    若输入快照重算得到不同批号（规则版本或代码变化），说明新旧结果不可互相解释，
+    拒绝写入并保留旧版，交由人工用新输入另建批次。
+    """
+    run_id=result['manifest']['run_id']
+    with connect(path) as con:
+        existing=con.execute('SELECT id,revision,status FROM runs WHERE id=?',(expected_id,)).fetchone()
+        if run_id!=expected_id:
+            if existing and existing['status']=='已复核':
+                raise BusinessError('RERUN_DIVERGED','重跑结果与已复核批次不一致，已保留旧版',409)
+            raise BusinessError('RERUN_DIVERGED','重跑结果与源快照批号不一致，未写入新批',409)
+        con.execute('INSERT OR IGNORE INTO runs(id,digest,result) VALUES(?,?,?)', (run_id,result['manifest']['sha256'],json.dumps(result,ensure_ascii=False)))
+    return get(path,run_id)
+
 def get(path, run_id):
     with connect(path) as con: row=con.execute('SELECT * FROM runs WHERE id=?',(run_id,)).fetchone()
     if not row: raise BusinessError('NOT_FOUND','批次不存在',404)

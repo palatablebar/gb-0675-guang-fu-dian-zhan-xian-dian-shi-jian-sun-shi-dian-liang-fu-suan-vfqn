@@ -29,7 +29,9 @@ def slice_intervals(records,context):
             for a,b in zip(ordered,ordered[1:]):
                 available=[r for r in readings if instant(r['at'])<=a<instant(r['at'])+timedelta(seconds=cadence)]
                 row=available[-1] if available else None
-                segments.append({'device':device,'start':a.isoformat(),'end':b.isoformat(),'seconds':int((b-a).total_seconds()),'sample_id':row['id'] if row else '', 'sample_at':row['at'] if row else '', 'actual_kw':row['power_kw'] if row else None,'irradiance':row['irradiance'] if row else None,'status':row['status'] if row else '缺测','zone':context['devices'][device]['zone'],'event_ids':merged['event_ids']})
+                segments.append({'device':device,'start':a.isoformat(),'end':b.isoformat(),'seconds':int((b-a).total_seconds()),'sample_id':row['id'] if row else '', 'sample_at':row['at'] if row else '', 'actual_kw':row['power_kw'] if row else None,'irradiance':row['irradiance'] if row else None,'status':row['status'] if row else '缺测','zone':context['devices'][device]['zone'],'event_ids':merged['event_ids'],
+                                 # 温度证据只跟随本片段的遥测样本，缺测片段不继承邻近样本。
+                                 'temp_c':row.get('temp_c') if row else None,'temp_code':row.get('temp_code') if row else None})
     return segments,unions
 
 def apply(state):
